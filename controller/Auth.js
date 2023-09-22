@@ -5,10 +5,8 @@ exports.createUser = async (req, res) => {
     try {
         const doc = await user.save();
         res.status(201).json(doc)
-
     } catch (err) {
         res.status(400).json(err)
-
     }
 };
 
