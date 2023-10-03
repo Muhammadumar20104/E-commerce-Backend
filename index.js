@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const server = express();
 const mongoose = require('mongoose');
@@ -21,13 +22,12 @@ const ordersRouter = require('./routes/Order');
 const { User } = require('./model/User');
 const { isAuth, sanitizeUser, cookieExtractor } = require('./services/common');
 
-const SECRET_KEY = 'SECRET_KEY';
 // JWT options
 
 
 const opts = {};
 opts.jwtFromRequest = cookieExtractor;
-opts.secretOrKey = SECRET_KEY; // TODO: should not be in code;
+opts.secretOrKey = process.env.JWT_SECRET_KEY; // TODO: should not be in code;
 
 //middlewares
 
@@ -35,7 +35,7 @@ server.use(express.static('build'))
 server.use(cookieParser());
 server.use(
   session({
-    secret: 'keyboard cat',
+    secret: process.env.SESSION_KEY,
     resave: false, // don't save session if unmodified
     saveUninitialized: false, // don't create session until something stored
   })
@@ -60,33 +60,33 @@ server.use('/orders', isAuth(), ordersRouter.router);
 passport.use(
   'local',
   new LocalStrategy(
-    {usernameField:'email'},
+    { usernameField: 'email' },
     async function (email, password, done) {
-    // by default passport uses username
-    try {
-      const user = await User.findOne({ email: email });
-      console.log(email, password, user);
-      if (!user) {
-        return done(null, false, { message: 'invalid credentials' }); // for safety
-      }
-      crypto.pbkdf2(
-        password,
-        user.salt,
-        310000,
-        32,
-        'sha256',
-        async function (err, hashedPassword) {
-          if (!crypto.timingSafeEqual(user.password, hashedPassword)) {
-            return done(null, false, { message: 'invalid credentials' });
-          }
-          const token = jwt.sign(sanitizeUser(user), SECRET_KEY);
-          done(null, {id:user.id, role:user.role}); // this lines sends to serializer
+      // by default passport uses username
+      try {
+        const user = await User.findOne({ email: email });
+        console.log(email, password, user);
+        if (!user) {
+          return done(null, false, { message: 'invalid credentials' }); // for safety
         }
-      );
-    } catch (err) {
-      done(err);
-    }
-  })
+        crypto.pbkdf2(
+          password,
+          user.salt,
+          310000,
+          32,
+          'sha256',
+          async function (err, hashedPassword) {
+            if (!crypto.timingSafeEqual(user.password, hashedPassword)) {
+              return done(null, false, { message: 'invalid credentials' });
+            }
+            const token = jwt.sign(sanitizeUser(user), process.env.SECRET_KEY);
+            done(null, { id: user.id, role: user.role ,token}); // this lines sends to serializer
+          }
+        );
+      } catch (err) {
+        done(err);
+      }
+    })
 );
 
 passport.use(
@@ -126,10 +126,10 @@ passport.deserializeUser(function (user, cb) {
 main().catch((err) => console.log(err));
 
 async function main() {
-  await mongoose.connect('mongodb://127.0.0.1:27017/ecommerce');
+  await mongoose.connect(process.env.MONGODB_URL);
   console.log('database connected');
 }
 
-server.listen(8080, () => {
+server.listen(process.env.PORT, () => {
   console.log('server started');
 });
